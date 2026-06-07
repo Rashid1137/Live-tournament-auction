@@ -642,31 +642,89 @@
 
     <script>
         // ==========================================
+        // UTILITY FUNCTIONS (DOB & Passcode Generators)
+        // ==========================================
+        
+        function populateDOB() {
+            const prefixes = ['regMgmt', 'resMgmt', 'regOwner', 'resOwner', 'regPlayer', 'resPlayer'];
+            prefixes.forEach(prefix => {
+                const daySelect = document.getElementById(`${prefix}DOB_d`);
+                const monthSelect = document.getElementById(`${prefix}DOB_m`);
+                const yearSelect = document.getElementById(`${prefix}DOB_y`);
+                
+                if (daySelect && monthSelect && yearSelect) {
+                    for (let i = 1; i <= 31; i++) {
+                        let opt = document.createElement('option');
+                        opt.value = i < 10 ? '0' + i : i;
+                        opt.innerText = i;
+                        daySelect.appendChild(opt);
+                    }
+                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    months.forEach((m, i) => {
+                        let opt = document.createElement('option');
+                        opt.value = i < 9 ? '0' + (i + 1) : (i + 1);
+                        opt.innerText = m;
+                        monthSelect.appendChild(opt);
+                    });
+                    const currentYear = new Date().getFullYear();
+                    // Generate years from 1950 to 10 years ago from current year
+                    for (let i = currentYear - 10; i >= 1950; i--) {
+                        let opt = document.createElement('option');
+                        opt.value = i;
+                        opt.innerText = i;
+                        yearSelect.appendChild(opt);
+                    }
+                }
+            });
+        }
+        
+        // Execute DOB Population when page loads
+        window.addEventListener('DOMContentLoaded', populateDOB);
+
+        function generatePasscode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = 'CRIC-';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        // ==========================================
         //  FIREBASE CONFIGURATION (Paste keys here)
         // ==========================================
         const firebaseConfig = {
-  apiKey: "AIzaSyDJ2h7hZPCFUi9WaH9psbe7w7B91TaXQgw",
-  authDomain: "live-tournament-auction.firebaseapp.com",
-  databaseURL: "https://live-tournament-auction-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "live-tournament-auction",
-  storageBucket: "live-tournament-auction.firebasestorage.app",
-  messagingSenderId: "1062655329146",
-  appId: "1:1062655329146:web:89b2abf01f8cb09d78ccc3",
-  measurementId: "G-ETJFB59XTH"
-};
+            apiKey: "AIzaSyDJ2h7hZPCFUi9WaH9psbe7w7B91TaXQgw",
+            authDomain: "live-tournament-auction.firebaseapp.com",
+            databaseURL: "https://live-tournament-auction-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "live-tournament-auction",
+            storageBucket: "live-tournament-auction.firebasestorage.app",
+            messagingSenderId: "1062655329146",
+            appId: "1:1062655329146:web:89b2abf01f8cb09d78ccc3",
+            measurementId: "G-ETJFB59XTH"
+        };
         
         firebase.initializeApp(firebaseConfig);
         const fbDB = firebase.database();
 
         let db = { users: { mgmt: {}, owner: {}, player: {} }, tournaments: {}, globalConfig: { mgmtPaid: false, adminUpi: '', mgmtFee: 0 } };
 
-        // Realtime data fetch from Firebase
+        // Realtime data fetch from Firebase (WITH DATA NORMALIZATION FOR EMPTY OBJECTS)
         fbDB.ref('pro_cric_auction_db').on('value', (snapshot) => {
             if(snapshot.exists()) {
                 db = snapshot.val();
                 if(!db.users) db.users = { mgmt: {}, owner: {}, player: {} };
+                if(!db.users.mgmt) db.users.mgmt = {};
+                if(!db.users.owner) db.users.owner = {};
+                if(!db.users.player) db.users.player = {};
                 if(!db.tournaments) db.tournaments = {};
                 if(!db.globalConfig) db.globalConfig = { mgmtPaid: false, adminUpi: '', mgmtFee: 0 };
+                
+                // Fix for Firebase dropping empty objects inside tournaments
+                Object.keys(db.tournaments).forEach(code => {
+                    if(!db.tournaments[code].joinedOwners) db.tournaments[code].joinedOwners = {};
+                    if(!db.tournaments[code].joinedPlayers) db.tournaments[code].joinedPlayers = {};
+                });
             }
         });
 
@@ -758,27 +816,6 @@
             osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.2); 
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const days = Array.from({length: 31}, (_, i) => i + 1);
-            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            const currentYear = new Date().getFullYear();
-            const years = Array.from({length: 100}, (_, i) => currentYear - i);
-            ['regMgmt', 'resMgmt', 'regOwner', 'resOwner', 'regPlayer', 'resPlayer'].forEach(prefix => {
-                const daySelect = document.getElementById(`${prefix}DOB_d`);
-                const monthSelect = document.getElementById(`${prefix}DOB_m`);
-                const yearSelect = document.getElementById(`${prefix}DOB_y`);
-                if(daySelect) {
-                    days.forEach(d => daySelect.add(new Option(d, d < 10 ? '0'+d : d)));
-                    months.forEach((m, i) => { let mv = i + 1; monthSelect.add(new Option(m, mv < 10 ? '0'+mv : mv)); });
-                    years.forEach(y => yearSelect.add(new Option(y, y)));
-                }
-            });
-            document.body.addEventListener('click', () => {
-                if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if(audioCtx.state === 'suspended') audioCtx.resume();
-            }, { once: true });
-        });
-
         function getDOBString(prefix) {
             const d = document.getElementById(`${prefix}DOB_d`).value;
             const m = document.getElementById(`${prefix}DOB_m`).value;
@@ -813,14 +850,18 @@
             document.getElementById('visitorTabs').classList.remove('hidden'); switchMainTab('mgmt');
         }
 
-        // UNIQUE UTR CHECK
+        // UNIQUE UTR CHECK FUNCTION
         function isUtrDuplicate(utr) {
             if(!utr) return false;
             for(let code in db.tournaments) {
                 let t = db.tournaments[code];
                 if(t.mgmtUtr === utr) return true;
-                for(let o in t.joinedOwners) { if(t.joinedOwners[o].utr === utr) return true; }
-                for(let p in t.joinedPlayers) { if(t.joinedPlayers[p].utr === utr) return true; }
+                if(t.joinedOwners) {
+                    for(let o in t.joinedOwners) { if(t.joinedOwners[o].utr === utr) return true; }
+                }
+                if(t.joinedPlayers) {
+                    for(let p in t.joinedPlayers) { if(t.joinedPlayers[p].utr === utr) return true; }
+                }
             }
             return false;
         }
@@ -849,7 +890,8 @@
             Object.keys(db.tournaments).forEach(code => {
                 const t = db.tournaments[code];
                 if(t.paymentStatus === 'Pending Verification') {
-                    const u = db.users.mgmt[t.mgmtPhone];
+                    // Check if management user exists safely
+                    const u = db.users.mgmt[t.mgmtPhone] || { phone: t.mgmtPhone }; 
                     tbody.innerHTML += `<tr>
                         <td><b>${u.phone}</b></td><td>${t.details.name}</td><td><span style="color:orange;font-weight:bold;">UTR: ${t.mgmtUtr}</span></td>
                         <td><button class="btn btn-success btn-sm" onclick="adminApproveTournament('${code}')">Make Live (Approve)</button></td>
@@ -870,7 +912,7 @@
         }
 
         // ==========================================
-        //  REGISTRATIONS
+        //  REGISTRATIONS (Safe check added)
         // ==========================================
         function registerManagement() {
             const name = document.getElementById('regMgmtName').value; const phone = document.getElementById('regMgmtPhone').value;
@@ -920,7 +962,11 @@
         function loginUser(role) {
             const phone = document.getElementById(`log${role.charAt(0).toUpperCase() + role.slice(1)}Phone`).value;
             const pass = document.getElementById(`log${role.charAt(0).toUpperCase() + role.slice(1)}Pass`).value;
-            const user = db.users[role][phone];
+            
+            // Safe assignment for role
+            const roleUsers = db.users[role] || {};
+            const user = roleUsers[phone];
+            
             if(user && user.pass === pass) {
                 activeSession = { role, phone, data: user };
                 document.getElementById('sessionIndicator').innerText = `Role: ${role.toUpperCase()} | ${user.name}`;
@@ -958,7 +1004,7 @@
             const regStart = document.getElementById('tRegStart').value; const regEnd = document.getElementById('tRegEnd').value;
             if(!details.name || !regStart || !regEnd) return showAlert("Tournament Name aur Dates mandatory hain!", "error");
             
-            const passcode = generatePasscode();
+            const passcode = generatePasscode(); // Now generates correctly
             const initPaymentStatus = db.globalConfig.mgmtPaid ? 'Not Paid' : 'Verified';
 
             db.tournaments[passcode] = {
@@ -1015,7 +1061,7 @@
                             <button class="delete-t-btn" onclick="deleteTournament('${code}')">✖</button>
                             <h3 style="margin-top:0; padding-right:30px;">${t.details.name}</h3>
                             <p><b>Passcode:</b> <span class="highlight-code" style="font-size:1rem; padding: 2px 8px;">${code}</span></p>
-                            <p><b>Joined:</b> ${Object.keys(t.joinedOwners).length} Owners | ${Object.keys(t.joinedPlayers).length} Players</p>
+                            <p><b>Joined:</b> ${Object.keys(t.joinedOwners || {}).length} Owners | ${Object.keys(t.joinedPlayers || {}).length} Players</p>
                             ${actionsHtml}
                         </div>`;
                 }
@@ -1096,7 +1142,7 @@
         function renderTADataLists() {
             const t = db.tournaments[activeTournamentCode];
             const oBody = document.getElementById('ta-owners-body'); oBody.innerHTML = "";
-            Object.keys(t.joinedOwners).forEach(phone => {
+            Object.keys(t.joinedOwners || {}).forEach(phone => {
                 const globalOwner = db.users.owner[phone]; const localData = t.joinedOwners[phone];
                 let payStr = localData.paymentStatus === 'Verified' ? `<span style="color:green;">Verified (UTR: ${localData.utr})</span>` :
                              localData.paymentStatus === 'Pending Verification' ? `<span style="color:orange;font-weight:bold;">UTR: ${localData.utr}</span>` : `<span style="color:red;">Not Paid</span>`;
@@ -1108,7 +1154,7 @@
             });
 
             const pBody = document.getElementById('ta-players-body'); pBody.innerHTML = ""; const uBody = document.getElementById('ta-unsold-body'); uBody.innerHTML = "";
-            Object.keys(t.joinedPlayers).forEach(phone => {
+            Object.keys(t.joinedPlayers || {}).forEach(phone => {
                 const globalPlayer = db.users.player[phone]; const localData = t.joinedPlayers[phone];
                 if (localData.soldStatus === 'Unsold') {
                     uBody.innerHTML += `<tr>
@@ -1130,12 +1176,12 @@
 
         function renderAllSquadsForAdmin() {
             const t = db.tournaments[activeTournamentCode]; const sqContainer = document.getElementById('ta-squads-container'); sqContainer.innerHTML = "";
-            Object.keys(t.joinedOwners).forEach(phone => {
+            Object.keys(t.joinedOwners || {}).forEach(phone => {
                 if(t.joinedOwners[phone].approved) {
                     const ownerUser = db.users.owner[phone];
                     let html = `<div class="card" style="padding:15px; border-top:3px solid var(--stadium-green);"><h4 style="margin:0;color:var(--night-sky)">🛡️ ${ownerUser.team}</h4><hr style="margin:10px 0;">`;
                     let count = 0; let spent = 0;
-                    Object.keys(t.joinedPlayers).forEach(pPhone => {
+                    Object.keys(t.joinedPlayers || {}).forEach(pPhone => {
                         const lp = t.joinedPlayers[pPhone];
                         if(lp.soldStatus === 'Sold' && lp.buyerTeam === ownerUser.team) {
                             html += `<div style="font-size:0.85rem; padding:4px 0; border-bottom:1px dashed #ccc;">🏏 ${db.users.player[pPhone].name} (₹${lp.finalPrice})</div>`;
@@ -1173,7 +1219,7 @@
             Object.keys(db.tournaments).forEach(code => {
                 const t = db.tournaments[code];
                 const dictName = activeSession.role === 'owner' ? 'joinedOwners' : 'joinedPlayers';
-                if(t[dictName][activeSession.phone]) {
+                if(t[dictName] && t[dictName][activeSession.phone]) {
                     found = true; const localData = t[dictName][activeSession.phone];
                     let specificStatus = ""; let paymentBlock = "";
 
@@ -1231,7 +1277,10 @@
             }
 
             const dictName = activeSession.role === 'owner' ? 'joinedOwners' : 'joinedPlayers';
-            if(t[dictName][activeSession.phone]) return showAlert("Aap is tournament ke liye pehle hi request bhej chuke hain!", "info");
+            if(t[dictName] && t[dictName][activeSession.phone]) return showAlert("Aap is tournament ke liye pehle hi request bhej chuke hain!", "info");
+
+            if(!t.joinedOwners) t.joinedOwners = {};
+            if(!t.joinedPlayers) t.joinedPlayers = {};
 
             if(activeSession.role === 'owner') t.joinedOwners[activeSession.phone] = { approved: false, paymentStatus: 'Not Paid', utr: '' };
             else t.joinedPlayers[activeSession.phone] = { approved: false, paymentStatus: 'Not Paid', utr: '', basePrice: 0, soldStatus: "Available", buyerTeam: "None", finalPrice: 0 };
@@ -1244,7 +1293,7 @@
         function openOwnerSquadModal(code) {
             const t = db.tournaments[code]; const sqList = document.getElementById('sqModalList'); sqList.innerHTML = "";
             let count = 0; let spent = 0;
-            Object.keys(t.joinedPlayers).forEach(pPhone => {
+            Object.keys(t.joinedPlayers || {}).forEach(pPhone => {
                 const lp = t.joinedPlayers[pPhone];
                 if(lp.soldStatus === 'Sold' && lp.buyerTeam === activeSession.data.team) {
                     const gp = db.users.player[pPhone]; count++; spent += lp.finalPrice;
@@ -1280,11 +1329,11 @@
             if(activeSession.role !== 'mgmt') return;
             const t = db.tournaments[arenaContextCode]; const tbody = document.getElementById('arMgmtSummaryBody'); tbody.innerHTML = "";
             const totalBudget = t.config.teamBudget || 5000000;
-            Object.keys(t.joinedOwners).forEach(phone => {
+            Object.keys(t.joinedOwners || {}).forEach(phone => {
                 if(t.joinedOwners[phone].approved) {
                     const ownerUser = db.users.owner[phone]; const purse = t.joinedOwners[phone].purse !== undefined ? t.joinedOwners[phone].purse : totalBudget;
                     const spent = totalBudget - purse; let playerCount = 0;
-                    Object.values(t.joinedPlayers).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === ownerUser.team) playerCount++; });
+                    Object.values(t.joinedPlayers || {}).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === ownerUser.team) playerCount++; });
                     tbody.innerHTML += `<tr><td><b>${ownerUser.team}</b></td><td style="color:${playerCount>=15?'red':'black'}">${playerCount}/15</td>
                         <td style="color:red;">₹${spent.toLocaleString('en-IN')}</td><td style="color:green; font-weight:bold;">₹${purse.toLocaleString('en-IN')}</td></tr>`;
                 }
@@ -1295,7 +1344,7 @@
             if(activeSession.role !== 'owner') return;
             const t = db.tournaments[arenaContextCode]; const squadList = document.getElementById('arOwnerSquadList');
             squadList.innerHTML = ""; let count = 0;
-            Object.keys(t.joinedPlayers).forEach(phone => {
+            Object.keys(t.joinedPlayers || {}).forEach(phone => {
                 const lp = t.joinedPlayers[phone];
                 if(lp.soldStatus === 'Sold' && lp.buyerTeam === activeSession.data.team) {
                     count++; const globP = db.users.player[phone];
@@ -1342,7 +1391,7 @@
 
         function adminRollNextPlayer() {
             clearInterval(timerEngine); const t = db.tournaments[arenaContextCode];
-            const availablePhones = Object.keys(t.joinedPlayers).filter(ph => t.joinedPlayers[ph].approved && t.joinedPlayers[ph].soldStatus === "Available");
+            const availablePhones = Object.keys(t.joinedPlayers || {}).filter(ph => t.joinedPlayers[ph].approved && t.joinedPlayers[ph].soldStatus === "Available");
             if(availablePhones.length === 0) return showAlert("Pool me koi Available player bacha nahi h! Unsold players ko wapas Re-Auction list me daalein.", "info");
 
             arenaPlayerPhoneActive = availablePhones[Math.floor(Math.random() * availablePhones.length)];
@@ -1375,7 +1424,7 @@
             if(!arenaPlayerPhoneActive) return showAlert("Floor par koi active player nahi h.", "error");
             if(activeSession.role === 'owner') {
                 const t = db.tournaments[arenaContextCode]; let boughtCount = 0;
-                Object.values(t.joinedPlayers).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === activeSession.data.team) boughtCount++; });
+                Object.values(t.joinedPlayers || {}).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === activeSession.data.team) boughtCount++; });
                 if(boughtCount >= 15) return showAlert("Aapki team mein 15 players poore ho chuke hain! Boli nahi laga sakte.", "error");
                 const purseLeft = t.joinedOwners[activeSession.phone].purse;
                 if((currentHighestBid + amt) > purseLeft) return showAlert(`Aapki remaining limit (₹${purseLeft.toLocaleString('en-IN')}) is bid ke liye kafi nahi hai!`, "error");
@@ -1397,7 +1446,7 @@
                 logs.innerHTML += `<div style="padding:5px; border-left:3px solid red;">❌ ${gPlayer.name} - UNSOLD</div>`;
             } else {
                 lPlayer.soldStatus = "Sold"; lPlayer.buyerTeam = highestBidderTeam; lPlayer.finalPrice = currentHighestBid;
-                let buyerPhone = null; Object.keys(t.joinedOwners).forEach(p => { if(db.users.owner[p].team === highestBidderTeam) buyerPhone = p; });
+                let buyerPhone = null; Object.keys(t.joinedOwners || {}).forEach(p => { if(db.users.owner[p].team === highestBidderTeam) buyerPhone = p; });
                 
                 if(buyerPhone) {
                     t.joinedOwners[buyerPhone].purse -= currentHighestBid;
