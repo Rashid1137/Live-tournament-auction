@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Cricket Tournament & Auction Engine</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <style>
+        :root {
+            --stadium-green: #064e3b;
+            --pitch-gold: #fbbf24;
+            --leather-red: #991b1b;
+            --night-sky: #0f172a;
+            --jersey-white: #ffffff;
+            --grass-light: #ecfdf5;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --accent: #2563eb;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+        }
+
+        .broadcast-banner {
+            background: linear-gradient(135deg, var(--stadium-green), var(--night-sky));
+            color: var(--jersey-white);
+            padding: 10px; text-align: center; font-size: 1.2rem;
+            font-weight: 800; text-transform: uppercase; letter-spacing: 2px;
+            border-bottom: 3px solid var(--pitch-gold);
+        }
+
+        header {
+            background-color: var(--night-sky); color: var(--jersey-white);
+            padding: 15px 30px; display: flex; justify-content: space-between;
+            align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .brand-logo { font-size: 1.5rem; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        .brand-logo span { color: var(--pitch-gold); }
+
+        .container { max-width: 1250px; margin: 30px auto; padding: 0 20px; }
+        .hidden { display: none !important; }
+
+        .portal-tabs { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+        .portal-btn {
+            background-color: var(--jersey-white); padding: 12px 25px;
+            font-weight: 700; font-size: 1rem; border-radius: 8px;
+            cursor: pointer; transition: all 0.3s; border: 2px solid transparent;
+        }
+        
+        /* MULTI-COLOR TABS */
+        #tabMgmt { border-color: #2563eb; color: #2563eb; }
+        #tabMgmt.active { background-color: #2563eb; color: white; }
+        #tabOwner { border-color: #d97706; color: #d97706; }
+        #tabOwner.active { background-color: #d97706; color: white; }
+        #tabPlayer { border-color: #059669; color: #059669; }
+        #tabPlayer.active { background-color: #059669; color: white; }
+
+        .card {
+            background: var(--jersey-white); border-radius: 12px; padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px;
+            border-top: 5px solid var(--stadium-green);
+        }
+        .card-title {
+            margin-top: 0; font-size: 1.4rem; border-left: 5px solid var(--pitch-gold);
+            padding-left: 12px; color: var(--night-sky); margin-bottom: 20px;
+        }
+
+        .sub-toggle-link { text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 1rem; }
+        .sub-toggle-link a { color: var(--accent); font-weight: 700; text-decoration: none; cursor: pointer; display: inline-block; margin: 5px 0; }
+        .sub-toggle-link a:hover { text-decoration: underline; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-weight: 600; margin-bottom: 5px; font-size: 0.9rem; color: #475569; }
+        .form-group input, .form-group select {
+            padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none; border-color: var(--stadium-green); box-shadow: 0 0 0 2px rgba(6, 78, 59, 0.2);
+        }
+
+        .dob-group { display: flex; gap: 8px; }
+        .dob-group select { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+
+        .btn { padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; border: none; font-size: 0.95rem; transition: background 0.2s; }
+        .btn-primary { background-color: var(--night-sky); color: white; }
+        .btn-primary:hover { background-color: var(--stadium-green); }
+        .btn-success { background-color: #10b981; color: white; }
+        .btn-danger { background-color: var(--leather-red); color: white; }
+        .btn-gold { background-color: var(--pitch-gold); color: var(--night-sky); }
+        .btn-sm { padding: 5px 10px; font-size: 0.85rem; }
+
+        .highlight-code { font-size: 1.5rem; letter-spacing: 2px; color: var(--stadium-green); font-weight: 900; background: var(--pitch-gold); padding: 5px 15px; border-radius: 6px; display: inline-block; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .tournament-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position:relative;}
+
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 0.9rem; }
+        th { background-color: #f1f5f9; color: var(--night-sky); }
+        .thumbnail { width: 45px; height: 45px; object-fit: cover; border-radius: 50%; border: 2px solid #ccc; }
+
+        .arena-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .stadium-box { text-align: center; border: 2px solid #e2e8f0; padding: 30px; border-radius: 12px; background: white; }
+        .live-photo { width: 160px; height: 160px; object-fit: cover; border-radius: 50%; border: 5px solid var(--stadium-green); margin-bottom: 15px; }
+        .timer-text { font-size: 2.5rem; font-weight: 900; color: var(--leather-red); animation: pulse 1s infinite; }
+        .timer-text.danger-time { color: red; animation: pulseFast 0.5s infinite; }
+        .bid-amount { font-size: 3rem; font-weight: 900; color: var(--stadium-green); margin: 10px 0; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        @keyframes pulseFast { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        
+        .payment-box { background: #fffbeb; border: 2px solid #fcd34d; padding: 15px; border-radius: 8px; margin-top: 10px; }
+        .payment-box input { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-weight:bold; }
+
+        /* CUSTOM STYLISH MODALS */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.8); display: flex; justify-content: center;
+            align-items: center; z-index: 9999; backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: white; padding: 30px; border-radius: 16px; text-align: center;
+            max-width: 450px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s ease-out;
+        }
+        .modal-box h2 { font-size: 3.5rem; margin: 0 0 15px 0; }
+        .modal-box p { font-size: 1.2rem; font-weight: 600; color: var(--text-dark); line-height: 1.5; margin-bottom: 25px; white-space: pre-wrap; }
+        .modal-box .btn-row { display: flex; gap: 10px; justify-content: center; }
+        .modal-box button { padding: 12px 30px; font-size: 1.1rem; }
+        @keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* CROPPER MODAL */
+        .crop-container { width: 100%; max-height: 400px; margin-bottom: 20px; }
+        .crop-container img { max-width: 100%; display: block; }
+        
+        /* SQUAD LIST MODAL */
+        .squad-modal-box { max-width: 600px; text-align: left; }
+        .squad-modal-list { max-height: 350px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 20px;}
+        .squad-item { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .squad-item img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        
+        .delete-t-btn { position: absolute; top: 10px; right: 10px; background: #fee2e2; color: #ef4444; border:none; border-radius:50%; width: 35px; height: 35px; cursor:pointer; font-size:1.1rem; font-weight:bold; }
+        .delete-t-btn:hover { background: #ef4444; color:white; }
+        
+        /* ADMIN SWITCH */
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+    </style>
+</head>
+<body>
+
+    <div id="customAlertModal" class="modal-overlay hidden">
+        <div class="modal-box" id="ca-box">
+            <h2 id="ca-icon">✅</h2>
+            <p id="ca-msg">Alert Message Here</p>
+            <button class="btn btn-primary" onclick="closeCustomAlert()">Theek Hai</button>
+        </div>
+    </div>
+
+    <div id="customConfirmModal" class="modal-overlay hidden">
+        <div class="modal-box" style="border-top: 8px solid var(--pitch-gold);">
+            <h2>⚠️</h2>
+            <p id="cc-msg">Are you sure?</p>
+            <div class="btn-row">
+                <button class="btn btn-danger" onclick="closeCustomConfirm()">Cancel</button>
+                <button class="btn btn-success" onclick="acceptCustomConfirm()">Yes, Proceed</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cropModal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 600px; border-top: 8px solid var(--accent);">
+            <h3 style="margin-top:0;">Crop Your Profile Photo</h3>
+            <div class="crop-container"><img id="cropImage" src=""></div>
+            <div class="btn-row">
+                <button class="btn btn-danger" onclick="cancelCrop()">Cancel</button>
+                <button class="btn btn-success" onclick="saveCrop()">Crop & Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="squadModal" class="modal-overlay hidden">
+        <div class="modal-box squad-modal-box" style="border-top: 8px solid var(--stadium-green);">
+            <h3 style="margin-top:0; color:var(--stadium-green);">🏆 My Squad & Purchases</h3>
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-weight:bold;">
+                <div>Players: <span id="sqModalCount" style="color:var(--accent);">0</span>/15</div>
+                <div>Spent: <span id="sqModalSpent" style="color:red;">₹0</span></div>
+            </div>
+            <div class="squad-modal-list" id="sqModalList"></div>
+            <div style="text-align: center;">
+                <button class="btn btn-primary" onclick="closeSquadModal()">Close List</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="broadcast-banner" id="globalBanner">WELCOME TO PRO TOURNAMENT PLATFORM</div>
+
+    <header>
+        <div class="brand-logo">🏏 Pro <span>Auction & Tournaments</span></div>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div id="sessionIndicator" style="font-size: 0.9rem; font-weight: bold; background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px;">Welcome</div>
+            <button class="btn btn-danger btn-sm" onclick="promptAdmin()">Admin Login</button>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <div id="visitorTabs" class="portal-tabs">
+            <button class="portal-btn active" id="tabMgmt" onclick="switchMainTab('mgmt')">⚙️ Management Portal</button>
+            <button class="portal-btn" id="tabOwner" onclick="switchMainTab('owner')">🏢 Team Owner Portal</button>
+            <button class="portal-btn" id="tabPlayer" onclick="switchMainTab('player')">🏃 Player Portal</button>
+        </div>
+
+        <div id="portal-mgmt" class="main-portal-view card" style="max-width: 800px; margin: 0 auto;">
+            <div id="mgmt-login">
+                <h3 class="card-title">Management Organizer Login</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Registered Phone Number</label><input type="text" id="logMgmtPhone" placeholder="Mobile Number"></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="logMgmtPass" placeholder="••••••••"></div>
+                </div>
+                <button class="btn btn-primary" onclick="loginUser('mgmt')">Login to Console</button>
+                <div class="sub-toggle-link">
+                    <a onclick="toggleSubView('mgmt', 'reg')">Register New Management Profile</a><br>
+                    <a style="color:var(--leather-red);" onclick="toggleSubView('mgmt', 'reset')">Forgot Password (Reset via DOB)</a>
+                </div>
+            </div>
+            
+            <div id="mgmt-reg" class="hidden">
+                <h3 class="card-title">Management Account Registration</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Organizer Full Name</label><input type="text" id="regMgmtName"></div>
+                    <div class="form-group"><label>Phone Number (Login ID)</label><input type="text" id="regMgmtPhone"></div>
+                    <div class="form-group"><label>Email Address</label><input type="email" id="regMgmtEmail"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="regMgmtDOB_d"><option value="">Day</option></select>
+                            <select id="regMgmtDOB_m"><option value="">Month</option></select>
+                            <select id="regMgmtDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Address Location</label><input type="text" id="regMgmtAddress"></div>
+                    <div class="form-group"><label>Create Password</label><input type="password" id="regMgmtPass"></div>
+                </div>
+                <button class="btn btn-success" onclick="registerManagement()">Create Management Profile</button>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('mgmt', 'login')">Back to Login</a></div>
+            </div>
+
+            <div id="mgmt-reset" class="hidden">
+                <h3 class="card-title">Reset Management Password</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Phone Number</label><input type="text" id="resMgmtPhone"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="resMgmtDOB_d"><option value="">Day</option></select>
+                            <select id="resMgmtDOB_m"><option value="">Month</option></select>
+                            <select id="resMgmtDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-gold" onclick="verifyDOB('mgmt')">Verify Details</button>
+                <div id="mgmt-new-pass-box" class="hidden" style="margin-top:15px;">
+                    <div class="form-group"><label>New Password</label><input type="password" id="newMgmtPass"></div>
+                    <button class="btn btn-success" style="margin-top:10px;" onclick="updatePassword('mgmt')">Update Password</button>
+                </div>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('mgmt', 'login')">Back to Login</a></div>
+            </div>
+        </div>
+
+        <div id="portal-owner" class="main-portal-view card hidden" style="max-width: 800px; margin: 0 auto;">
+            <div id="owner-login">
+                <h3 class="card-title">Franchise Owner Login</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Registered Phone Number</label><input type="text" id="logOwnerPhone" placeholder="Mobile Number"></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="logOwnerPass" placeholder="••••••••"></div>
+                </div>
+                <button class="btn btn-primary" onclick="loginUser('owner')">Login to Console</button>
+                <div class="sub-toggle-link">
+                    <a onclick="toggleSubView('owner', 'reg')">Register New Team Owner Profile</a><br>
+                    <a style="color:var(--leather-red);" onclick="toggleSubView('owner', 'reset')">Forgot Password (Reset via DOB)</a>
+                </div>
+            </div>
+            
+            <div id="owner-reg" class="hidden">
+                <h3 class="card-title">Team Owner Registration</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Full Name</label><input type="text" id="regOwnerName"></div>
+                    <div class="form-group"><label>Phone Number (Login ID)</label><input type="text" id="regOwnerPhone"></div>
+                    <div class="form-group"><label>Team Name</label><input type="text" id="regOwnerTeam"></div>
+                    <div class="form-group"><label>Email Address</label><input type="email" id="regOwnerEmail"></div>
+                    <div class="form-group"><label>Address</label><input type="text" id="regOwnerAddress"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="regOwnerDOB_d"><option value="">Day</option></select>
+                            <select id="regOwnerDOB_m"><option value="">Month</option></select>
+                            <select id="regOwnerDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Create Password</label><input type="password" id="regOwnerPass"></div>
+                    <div class="form-group"><label>Owner Photo (Face)</label><input type="file" id="regOwnerPhoto" accept="image/*" onchange="openCropper(event, 'owner')">
+                    <small id="ownerPhotoStatus" style="color:var(--stadium-green); font-weight:bold;"></small></div>
+                </div>
+                <button class="btn btn-success" onclick="registerOwner()">Register Profile</button>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('owner', 'login')">Back to Login</a></div>
+            </div>
+
+            <div id="owner-reset" class="hidden">
+                <h3 class="card-title">Reset Owner Password</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Phone Number</label><input type="text" id="resOwnerPhone"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="resOwnerDOB_d"><option value="">Day</option></select>
+                            <select id="resOwnerDOB_m"><option value="">Month</option></select>
+                            <select id="resOwnerDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-gold" onclick="verifyDOB('owner')">Verify Details</button>
+                <div id="owner-new-pass-box" class="hidden" style="margin-top:15px;">
+                    <div class="form-group"><label>New Password</label><input type="password" id="newOwnerPass"></div>
+                    <button class="btn btn-success" style="margin-top:10px;" onclick="updatePassword('owner')">Update Password</button>
+                </div>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('owner', 'login')">Back to Login</a></div>
+            </div>
+        </div>
+
+        <div id="portal-player" class="main-portal-view card hidden" style="max-width: 800px; margin: 0 auto;">
+            <div id="player-login">
+                <h3 class="card-title">Player Draft Login</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Registered Phone Number</label><input type="text" id="logPlayerPhone" placeholder="Mobile Number"></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="logPlayerPass" placeholder="••••••••"></div>
+                </div>
+                <button class="btn btn-primary" onclick="loginUser('player')">Login to Console</button>
+                <div class="sub-toggle-link">
+                    <a onclick="toggleSubView('player', 'reg')">Register New Player Profile</a><br>
+                    <a style="color:var(--leather-red);" onclick="toggleSubView('player', 'reset')">Forgot Password (Reset via DOB)</a>
+                </div>
+            </div>
+            
+            <div id="player-reg" class="hidden">
+                <h3 class="card-title">Player Draft Registration</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Full Name</label><input type="text" id="regPlayerName"></div>
+                    <div class="form-group"><label>Phone Number (Login ID)</label><input type="text" id="regPlayerPhone"></div>
+                    <div class="form-group"><label>Batting Style</label><select id="regPlayerBatting"><option>Right Hand Batsman</option><option>Left Hand Batsman</option></select></div>
+                    <div class="form-group"><label>Bowling Style</label><select id="regPlayerBowling"><option>Right-arm Fast</option><option>Left-arm Fast</option><option>Right-arm Spin</option><option>Left-arm Spin</option><option>Pure Batsman/WK</option></select></div>
+                    <div class="form-group"><label>T-Shirt Size</label><select id="regPlayerTsize"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div>
+                    <div class="form-group"><label>T-Shirt Number</label><input type="number" id="regPlayerTnum" placeholder="E.g. 10"></div>
+                    <div class="form-group"><label>Address</label><input type="text" id="regPlayerAddress"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="regPlayerDOB_d"><option value="">Day</option></select>
+                            <select id="regPlayerDOB_m"><option value="">Month</option></select>
+                            <select id="regPlayerDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Create Password</label><input type="password" id="regPlayerPass"></div>
+                    <div class="form-group"><label>Profile Photo (Face)</label><input type="file" id="regPlayerPhoto" accept="image/*" onchange="openCropper(event, 'player')">
+                    <small id="playerPhotoStatus" style="color:var(--stadium-green); font-weight:bold;"></small></div>
+                </div>
+                <button class="btn btn-success" onclick="registerPlayer()">Register Player Profile</button>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('player', 'login')">Back to Login</a></div>
+            </div>
+
+            <div id="player-reset" class="hidden">
+                <h3 class="card-title">Reset Player Password</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Phone Number</label><input type="text" id="resPlayerPhone"></div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <div class="dob-group">
+                            <select id="resPlayerDOB_d"><option value="">Day</option></select>
+                            <select id="resPlayerDOB_m"><option value="">Month</option></select>
+                            <select id="resPlayerDOB_y"><option value="">Year</option></select>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-gold" onclick="verifyDOB('player')">Verify Details</button>
+                <div id="player-new-pass-box" class="hidden" style="margin-top:15px;">
+                    <div class="form-group"><label>New Password</label><input type="password" id="newPlayerPass"></div>
+                    <button class="btn btn-success" style="margin-top:10px;" onclick="updatePassword('player')">Update Password</button>
+                </div>
+                <div class="sub-toggle-link"><a onclick="toggleSubView('player', 'login')">Back to Login</a></div>
+            </div>
+        </div>
+
+        <div id="workspace-admin" class="workspace-view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>👑 Main Admin Control Panel</h2>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+            <div class="card" style="background:#eff6ff; border-top: 5px solid #3b82f6;">
+                <h3 class="card-title">Paid Management Configuration</h3>
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adminToggleMgmtPaid">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-weight:bold; font-size:1.1rem;">Enable Paid Feature to Make Tournament LIVE</span>
+                </div>
+                <div class="form-grid" id="adminPaidBox">
+                    <div class="form-group"><label>Admin UPI ID</label><input type="text" id="adminUpi" placeholder="Enter UPI ID"></div>
+                    <div class="form-group"><label>Management Entry Fee (₹)</label><input type="number" id="adminMgmtFee" placeholder="E.g. 5000"></div>
+                </div>
+                <button class="btn btn-primary" onclick="saveAdminSettings()">Save Global Settings</button>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">Pending Tournaments (Make Live Approvals)</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Organizer Phone</th><th>Tournament Name</th><th>Payment/UTR</th><th>Action</th></tr></thead>
+                        <tbody id="admin-mgmt-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="workspace-mgmt" class="workspace-view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>⚙️ Management Master Control</h2>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="card" style="background: var(--grass-light); border-color: var(--stadium-green);">
+                <h3 class="card-title">🏟️ Create New Tournament</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Tournament Name</label><input type="text" id="tName" placeholder="E.g. Summer Premier League"></div>
+                    <div class="form-group"><label>Registration Start Date</label><input type="date" id="tRegStart"></div>
+                    <div class="form-group"><label>Registration End Date</label><input type="date" id="tRegEnd"></div>
+                    <div class="form-group"><label>Allowed DOB (From Date)</label><input type="date" id="tDobStart"></div>
+                    <div class="form-group"><label>Allowed DOB (To Date)</label><input type="date" id="tDobEnd"></div>
+                    <div class="form-group"><label>Total Teams</label><input type="number" id="tTeams" placeholder="Count (e.g. 8)"></div>
+                    <div class="form-group"><label>Tournament Type</label>
+                        <select id="tType"><option>League + Knockout</option><option>Knockout Only</option><option>Box Cricket</option></select>
+                    </div>
+                    <div class="form-group"><label>Total Overs per Innings</label><input type="number" id="tOvers" placeholder="E.g. 20"></div>
+                    <div class="form-group"><label>Powerplay Overs</label><input type="number" id="tPowerplay" placeholder="E.g. 6"></div>
+                    <div class="form-group"><label>Location / Venue Ground</label><input type="text" id="tLocation" placeholder="Stadium Name"></div>
+                    <div class="form-group"><label>Winner Team Prize (₹)</label><input type="text" id="tWinPrize" placeholder="Amount"></div>
+                    <div class="form-group"><label>Runner-up Prize (₹)</label><input type="text" id="tRunnerPrize" placeholder="Amount"></div>
+                    <div class="form-group"><label>Management UPI ID</label><input type="text" id="tUpiId" placeholder="E.g. myname@ybl"></div>
+                    <div class="form-group"><label>Owner Entry Fee (₹)</label><input type="number" id="tOwnerFee" placeholder="E.g. 10000"></div>
+                    <div class="form-group"><label>Player Entry Fee (₹)</label><input type="number" id="tPlayerFee" placeholder="E.g. 500"></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Management Members Info</label><input type="text" id="tMembers" placeholder="Names or total count"></div>
+                </div>
+                <button class="btn btn-primary" onclick="createTournament()">Generate New Tournament & Passcode</button>
+            </div>
+
+            <h3>📋 My Created Tournaments</h3>
+            <div class="dashboard-grid" id="mgmt-tournaments-list"></div>
+        </div>
+
+        <div id="workspace-tournament-admin" class="workspace-view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>⚙️ Tournament Configuration Studio</h2>
+                <button class="btn btn-danger" onclick="closeTournamentAdmin()">Back to My Tournaments</button>
+            </div>
+
+            <div class="card" style="text-align: center;">
+                <h2 style="margin-top:0;" id="ta-name">Tournament Name</h2>
+                <p>Share this exact passcode with Owners & Players so they can join your tournament.</p>
+                <div class="highlight-code" id="ta-code">CODE123</div>
+            </div>
+
+            <div class="portal-tabs">
+                <button class="portal-btn active" id="btn-ta-config" onclick="switchTAView('config')">Rules & Financials</button>
+                <button class="portal-btn" id="btn-ta-owners" onclick="switchTAView('owners')">Owners (Payments)</button>
+                <button class="portal-btn" id="btn-ta-players" onclick="switchTAView('players')">Players (Unsold/Pay)</button>
+                <button class="portal-btn" id="btn-ta-squads" onclick="switchTAView('squads')">All Teams Squad</button>
+            </div>
+
+            <div id="ta-config" class="ta-view card">
+                <h3 class="card-title">Dates, Rules & Fees</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Broadcast Headline Text</label><input type="text" id="taHead" placeholder="Top Banner Text"></div>
+                    <div class="form-group"><label>Live Auction Start (Date & Time)</label><input type="datetime-local" id="taAuctionDate"></div>
+                    <div class="form-group"><label>Auction Timer Limit (Seconds)</label><input type="number" id="taTimerSeconds" placeholder="E.g. 30"></div>
+                    <div class="form-group"><label>Management UPI ID</label><input type="text" id="taUpiId"></div>
+                    <div class="form-group"><label>Owner Entry Fee (₹)</label><input type="number" id="taOwnerFee"></div>
+                    <div class="form-group"><label>Player Entry Fee (₹)</label><input type="number" id="taPlayerFee"></div>
+                    <div class="form-group"><label>Allowed DOB (From)</label><input type="date" id="taDobStart"></div>
+                    <div class="form-group"><label>Allowed DOB (To)</label><input type="date" id="taDobEnd"></div>
+                </div>
+                <hr style="margin: 20px 0;">
+                <h3 class="card-title">💰 Auction Financial Rules</h3>
+                <div class="form-grid">
+                    <div class="form-group"><label>Total Team Limit/Budget (₹)</label><input type="number" id="taTeamBudget" placeholder="E.g. 5000000"></div>
+                    <div class="form-group"><label>Bid Button 1 Amount (₹)</label><input type="number" id="taBid1" placeholder="E.g. 50000"></div>
+                    <div class="form-group"><label>Bid Button 2 Amount (₹)</label><input type="number" id="taBid2" placeholder="E.g. 100000"></div>
+                    <div class="form-group"><label>Bid Button 3 Amount (₹)</label><input type="number" id="taBid3" placeholder="E.g. 200000"></div>
+                </div>
+                <button class="btn btn-success" onclick="saveTAConfig()">Save Settings</button>
+                <hr style="margin: 20px 0;">
+                <h3 class="card-title">🔴 Launch Auction Room</h3>
+                <button class="btn btn-danger" style="font-size: 1.1rem; padding: 12px 30px;" onclick="launchLiveArenaAsAdmin()">Open Real-Time Bidding Room</button>
+            </div>
+
+            <div id="ta-owners" class="ta-view card hidden">
+                <h3 class="card-title">Franchise Owners - Pending Verifications</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Photo</th><th>Name</th><th>Team</th><th>Phone</th><th>Payment/UTR</th><th>Approve</th><th>Remove</th></tr></thead>
+                        <tbody id="ta-owners-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="ta-players" class="ta-view card hidden">
+                <h3 class="card-title">Players Draft Pool - Pending Verifications</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Photo</th><th>Player (T-Shirt)</th><th>Style</th><th>Payment/UTR</th><th>Base Price (₹)</th><th>Approve</th><th>Remove</th></tr></thead>
+                        <tbody id="ta-players-body"></tbody>
+                    </table>
+                </div>
+
+                <h3 class="card-title" style="margin-top: 40px; border-left-color: var(--leather-red);">Unsold Players (Re-Auction)</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th>Photo</th><th>Player</th><th>Style</th><th>Status</th><th>New Base Price (₹)</th><th>Action</th></tr></thead>
+                        <tbody id="ta-unsold-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="ta-squads" class="ta-view hidden">
+                <h3 class="card-title" style="margin-top:20px;">🏆 All Teams Roster</h3>
+                <div id="ta-squads-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;"></div>
+            </div>
+        </div>
+
+        <div id="workspace-user" class="workspace-view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 id="user-welcome-text">👋 Welcome Profile</h2>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="card" style="background: #eff6ff; border-color: var(--accent);">
+                <h3 class="card-title">🔗 Link / Join a Tournament</h3>
+                <div style="display: flex; gap: 10px; max-width: 400px;">
+                    <input type="text" id="joinPasscode" placeholder="Enter Passcode (e.g. CRIC-XYZ)" style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; text-transform: uppercase;">
+                    <button class="btn btn-primary" onclick="joinTournamentViaCode()">Join Tournament</button>
+                </div>
+            </div>
+
+            <h3>📊 My Linked Tournaments & Payments</h3>
+            <div class="dashboard-grid" id="user-tournaments-list"></div>
+        </div>
+
+        <div id="workspace-arena" class="workspace-view hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color:var(--stadium-green); margin:0;">🏟️ <span id="arenaTName">Tournament Name</span> - Live Floor</h2>
+                <button class="btn btn-danger" onclick="exitLiveArena()">Exit Arena Floor</button>
+            </div>
+
+            <div class="arena-layout">
+                <div class="stadium-box">
+                    <img id="arPhoto" src="https://via.placeholder.com/160" class="live-photo">
+                    <h2 id="arName" style="margin: 5px 0;">Waiting For Draft Roll...</h2>
+                    
+                    <div style="display: flex; justify-content: center; gap: 15px; margin: 15px 0; font-weight: bold; background:#f1f5f9; padding: 10px; border-radius:8px;">
+                        <div>🏏 <span id="arBat">-</span></div> | <div>🥎 <span id="arBowl">-</span></div> | <div>💰 Base: <span id="arBaseVal" style="color:var(--pitch-gold);">₹0</span></div>
+                    </div>
+
+                    <div style="background: var(--grass-light); padding: 20px; border-radius: 12px; border: 2px dashed var(--stadium-green); margin: 20px 0;">
+                        <h4 style="margin: 0; color: var(--text-muted);">Current Running Board Bid</h4>
+                        <div class="bid-amount">₹<span id="arCurrentBid">0</span></div>
+                        <h3 style="margin: 0;">Holder: <span id="arLastBidder" style="color: var(--leather-red);">No Active Bids</span></h3>
+                    </div>
+
+                    <div class="timer-text" id="arTimerDisplay">⏳ Countdown: <span id="arTimer">0</span>s</div>
+
+                    <div id="arOwnerWallet" class="hidden" style="background: #0f172a; color: white; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <div style="font-size: 0.95rem; color: #cbd5e1;">Total Limit Allowed: ₹<span id="walletTotal">0</span></div>
+                            <div style="font-size: 0.95rem; color: #fcd34d;">Squad Size: <span id="ownerSquadCount">0</span>/15</div>
+                        </div>
+                        <div style="font-size: 1.4rem; font-weight: bold; color: var(--pitch-gold); margin-top: 5px;">Your Remaining Limit: ₹<span id="walletLeft">0</span></div>
+                    </div>
+
+                    <div id="arOwnerControls" class="hidden" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;"></div>
+
+                    <div id="arAdminControls" class="hidden" style="margin-top: 20px;">
+                        <button class="btn btn-gold" onclick="adminRollNextPlayer()">Cycle Next Available Player</button>
+                    </div>
+
+                    <div id="arMgmtSummary" class="card hidden" style="margin-top: 30px; text-align: left; padding: 20px; border-top: 4px solid var(--accent);">
+                        <h3 style="margin-top:0;">📊 Team Budgets & Roster Summary</h3>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>Team Name</th><th>Players Bought</th><th>Spent (₹)</th><th>Remaining (₹)</th></tr></thead>
+                                <tbody id="arMgmtSummaryBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div id="arOwnerSquadView" class="card hidden" style="padding: 20px; border-top: 4px solid var(--stadium-green); margin-bottom: 20px;">
+                        <h3 style="margin-top:0; color: var(--stadium-green);">👥 My Team Squad</h3>
+                        <div id="arOwnerSquadList" style="max-height: 200px; overflow-y: auto; font-size: 0.9rem; border: 1px solid #e2e8f0; padding: 10px; border-radius: 6px;">
+                            No players bought yet.
+                        </div>
+                    </div>
+
+                    <div class="card" style="padding: 20px;">
+                        <h3 style="margin-top: 0; border-left: 4px solid var(--leather-red); padding-left: 10px;">📜 Floor Registry Ledger</h3>
+                        <div id="arLogs" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        //  FIREBASE CONFIGURATION (Paste keys here)
+        // ==========================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyDJ2h7hZPCFUi9WaH9psbe7w7B91TaXQgw",
+  authDomain: "live-tournament-auction.firebaseapp.com",
+  databaseURL: "https://live-tournament-auction-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "live-tournament-auction",
+  storageBucket: "live-tournament-auction.firebasestorage.app",
+  messagingSenderId: "1062655329146",
+  appId: "1:1062655329146:web:89b2abf01f8cb09d78ccc3",
+  measurementId: "G-ETJFB59XTH"
+};
+        
+        firebase.initializeApp(firebaseConfig);
+        const fbDB = firebase.database();
+
+        let db = { users: { mgmt: {}, owner: {}, player: {} }, tournaments: {}, globalConfig: { mgmtPaid: false, adminUpi: '', mgmtFee: 0 } };
+
+        // Realtime data fetch from Firebase
+        fbDB.ref('pro_cric_auction_db').on('value', (snapshot) => {
+            if(snapshot.exists()) {
+                db = snapshot.val();
+                if(!db.users) db.users = { mgmt: {}, owner: {}, player: {} };
+                if(!db.tournaments) db.tournaments = {};
+                if(!db.globalConfig) db.globalConfig = { mgmtPaid: false, adminUpi: '', mgmtFee: 0 };
+            }
+        });
+
+        function saveData() {
+            fbDB.ref('pro_cric_auction_db').set(db);
+        }
+
+        // ==========================================
+        //  CUSTOM ALERTS & MODALS SYSTEM
+        // ==========================================
+        function showAlert(msg, type='info') {
+            const modal = document.getElementById('customAlertModal');
+            const icon = document.getElementById('ca-icon');
+            const message = document.getElementById('ca-msg');
+            const box = document.getElementById('ca-box');
+            
+            modal.classList.remove('hidden');
+            message.innerText = msg;
+            box.style.borderTop = "8px solid ";
+            if(type === 'success') { icon.innerHTML = "✅"; icon.style.color = "#10b981"; box.style.borderTopColor = "#10b981"; } 
+            else if(type === 'error') { icon.innerHTML = "❌"; icon.style.color = "#ef4444"; box.style.borderTopColor = "#ef4444"; } 
+            else { icon.innerHTML = "ℹ️"; icon.style.color = "#3b82f6"; box.style.borderTopColor = "#3b82f6"; }
+        }
+        function closeCustomAlert() { document.getElementById('customAlertModal').classList.add('hidden'); }
+
+        let pendingConfirmCallback = null;
+        function showConfirm(msg, callback) {
+            document.getElementById('cc-msg').innerText = msg;
+            document.getElementById('customConfirmModal').classList.remove('hidden');
+            pendingConfirmCallback = callback;
+        }
+        function acceptCustomConfirm() {
+            document.getElementById('customConfirmModal').classList.add('hidden');
+            if(pendingConfirmCallback) pendingConfirmCallback();
+        }
+        function closeCustomConfirm() {
+            document.getElementById('customConfirmModal').classList.add('hidden');
+            pendingConfirmCallback = null;
+        }
+
+        function clearFormInputs(parentId) {
+            const parent = document.getElementById(parentId);
+            if(parent) {
+                const inputs = parent.querySelectorAll('input');
+                inputs.forEach(i => { if(i.type !== 'button' && i.type !== 'submit') i.value = ''; });
+            }
+        }
+
+        // ==========================================
+        //  CROPPER SYSTEM
+        // ==========================================
+        let cropper; let currentCropTarget = ''; let croppedImages = { owner: '', player: '' };
+        function openCropper(event, target) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('cropImage').src = e.target.result;
+                document.getElementById('cropModal').classList.remove('hidden');
+                currentCropTarget = target;
+                if(cropper) cropper.destroy();
+                cropper = new Cropper(document.getElementById('cropImage'), { aspectRatio: 1, viewMode: 1 });
+            };
+            reader.readAsDataURL(file);
+        }
+        function saveCrop() {
+            if(!cropper) return;
+            croppedImages[currentCropTarget] = cropper.getCroppedCanvas({width:300, height:300}).toDataURL();
+            document.getElementById(`${currentCropTarget}PhotoStatus`).innerText = "Photo Cropped ✅";
+            document.getElementById('cropModal').classList.add('hidden');
+            cropper.destroy(); cropper = null;
+        }
+        function cancelCrop() {
+            document.getElementById('cropModal').classList.add('hidden');
+            if(cropper) { cropper.destroy(); cropper = null; }
+            document.getElementById(`reg${currentCropTarget.charAt(0).toUpperCase() + currentCropTarget.slice(1)}Photo`).value = "";
+        }
+
+        // ==========================================
+        //  AUDIO SYSTEM
+        // ==========================================
+        let audioCtx;
+        function playBeep() {
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'sine'; osc.frequency.value = 800;
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+            osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.2); 
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const days = Array.from({length: 31}, (_, i) => i + 1);
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const currentYear = new Date().getFullYear();
+            const years = Array.from({length: 100}, (_, i) => currentYear - i);
+            ['regMgmt', 'resMgmt', 'regOwner', 'resOwner', 'regPlayer', 'resPlayer'].forEach(prefix => {
+                const daySelect = document.getElementById(`${prefix}DOB_d`);
+                const monthSelect = document.getElementById(`${prefix}DOB_m`);
+                const yearSelect = document.getElementById(`${prefix}DOB_y`);
+                if(daySelect) {
+                    days.forEach(d => daySelect.add(new Option(d, d < 10 ? '0'+d : d)));
+                    months.forEach((m, i) => { let mv = i + 1; monthSelect.add(new Option(m, mv < 10 ? '0'+mv : mv)); });
+                    years.forEach(y => yearSelect.add(new Option(y, y)));
+                }
+            });
+            document.body.addEventListener('click', () => {
+                if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+            }, { once: true });
+        });
+
+        function getDOBString(prefix) {
+            const d = document.getElementById(`${prefix}DOB_d`).value;
+            const m = document.getElementById(`${prefix}DOB_m`).value;
+            const y = document.getElementById(`${prefix}DOB_y`).value;
+            if(!d || !m || !y) return null; return `${y}-${m}-${d}`;
+        }
+
+        function switchMainTab(role) {
+            document.querySelectorAll('.main-portal-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`portal-${role}`).classList.remove('hidden');
+            document.querySelectorAll('.portal-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab${role.charAt(0).toUpperCase() + role.slice(1)}`).classList.add('active');
+        }
+        function toggleSubView(role, view) {
+            document.getElementById(`${role}-login`).classList.toggle('hidden', view !== 'login');
+            document.getElementById(`${role}-reg`).classList.toggle('hidden', view !== 'reg');
+            document.getElementById(`${role}-reset`).classList.toggle('hidden', view !== 'reset');
+        }
+        function renderWorkspace(workspaceId) {
+            document.getElementById('visitorTabs').classList.add('hidden');
+            document.querySelectorAll('.main-portal-view').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.workspace-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(workspaceId).classList.remove('hidden');
+        }
+
+        let activeSession = null; 
+        function logout() {
+            activeSession = null; activeTournamentCode = null;
+            document.getElementById('sessionIndicator').innerText = "Welcome";
+            document.getElementById('globalBanner').innerText = "WELCOME TO PRO TOURNAMENT PLATFORM";
+            document.querySelectorAll('.workspace-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById('visitorTabs').classList.remove('hidden'); switchMainTab('mgmt');
+        }
+
+        // UNIQUE UTR CHECK
+        function isUtrDuplicate(utr) {
+            if(!utr) return false;
+            for(let code in db.tournaments) {
+                let t = db.tournaments[code];
+                if(t.mgmtUtr === utr) return true;
+                for(let o in t.joinedOwners) { if(t.joinedOwners[o].utr === utr) return true; }
+                for(let p in t.joinedPlayers) { if(t.joinedPlayers[p].utr === utr) return true; }
+            }
+            return false;
+        }
+
+        // ==========================================
+        //  MAIN ADMIN CONTROLS
+        // ==========================================
+        function promptAdmin() {
+            const pwd = prompt("Enter Admin Password:");
+            if(pwd === "14 22 12" || pwd === "142212") {
+                activeSession = { role: 'admin' };
+                document.getElementById('sessionIndicator').innerText = "👑 Main Admin";
+                buildAdminDashboard();
+            } else if (pwd !== null) {
+                showAlert("Galat Password!", "error");
+            }
+        }
+        function buildAdminDashboard() {
+            renderWorkspace('workspace-admin');
+            document.getElementById('adminToggleMgmtPaid').checked = db.globalConfig.mgmtPaid;
+            document.getElementById('adminUpi').value = db.globalConfig.adminUpi || '';
+            document.getElementById('adminMgmtFee').value = db.globalConfig.mgmtFee || '';
+            
+            const tbody = document.getElementById('admin-mgmt-list');
+            tbody.innerHTML = "";
+            Object.keys(db.tournaments).forEach(code => {
+                const t = db.tournaments[code];
+                if(t.paymentStatus === 'Pending Verification') {
+                    const u = db.users.mgmt[t.mgmtPhone];
+                    tbody.innerHTML += `<tr>
+                        <td><b>${u.phone}</b></td><td>${t.details.name}</td><td><span style="color:orange;font-weight:bold;">UTR: ${t.mgmtUtr}</span></td>
+                        <td><button class="btn btn-success btn-sm" onclick="adminApproveTournament('${code}')">Make Live (Approve)</button></td>
+                    </tr>`;
+                }
+            });
+            if(tbody.innerHTML === "") tbody.innerHTML = "<tr><td colspan='4'>No pending tournament payments.</td></tr>";
+        }
+        function saveAdminSettings() {
+            db.globalConfig.mgmtPaid = document.getElementById('adminToggleMgmtPaid').checked;
+            db.globalConfig.adminUpi = document.getElementById('adminUpi').value;
+            db.globalConfig.mgmtFee = parseInt(document.getElementById('adminMgmtFee').value) || 0;
+            saveData(); showAlert("Global Admin Settings Saved!", "success"); buildAdminDashboard();
+        }
+        function adminApproveTournament(code) {
+            db.tournaments[code].paymentStatus = 'Verified';
+            saveData(); showAlert("Tournament Approved and is now LIVE!", "success"); buildAdminDashboard();
+        }
+
+        // ==========================================
+        //  REGISTRATIONS
+        // ==========================================
+        function registerManagement() {
+            const name = document.getElementById('regMgmtName').value; const phone = document.getElementById('regMgmtPhone').value;
+            const email = document.getElementById('regMgmtEmail').value; const address = document.getElementById('regMgmtAddress').value;
+            const pass = document.getElementById('regMgmtPass').value; const dob = getDOBString('regMgmt');
+            if(!name || !phone || !dob || !pass) return showAlert("Puri details bharein!", "error");
+            if(db.users.mgmt[phone]) return showAlert("Is phone number se already Management profile bani hui hai!", "error");
+            
+            db.users.mgmt[phone] = { name, phone, email, dob, address, pass };
+            saveData(); 
+            clearFormInputs('mgmt-reg');
+            showAlert("Management Registration Successfully!", "success"); 
+            toggleSubView('mgmt', 'login');
+        }
+
+        function registerOwner() {
+            const name = document.getElementById('regOwnerName').value; const phone = document.getElementById('regOwnerPhone').value;
+            const team = document.getElementById('regOwnerTeam').value; const pass = document.getElementById('regOwnerPass').value;
+            const dob = getDOBString('regOwner'); const photo = croppedImages.owner || "https://via.placeholder.com/150";
+            if(!name || !phone || !team || !dob || !pass) return showAlert("Puri details bharein!", "error");
+            if(db.users.owner[phone]) return showAlert("Is phone number se already Owner profile bani hui hai!", "error");
+
+            db.users.owner[phone] = { name, phone, team, dob, pass, photo };
+            saveData(); 
+            clearFormInputs('owner-reg'); croppedImages.owner = ""; document.getElementById('ownerPhotoStatus').innerText = "";
+            showAlert("Owner Registration Successfully!", "success"); 
+            toggleSubView('owner', 'login');
+        }
+
+        function registerPlayer() {
+            const name = document.getElementById('regPlayerName').value; const phone = document.getElementById('regPlayerPhone').value;
+            const batting = document.getElementById('regPlayerBatting').value; const bowling = document.getElementById('regPlayerBowling').value;
+            const tSize = document.getElementById('regPlayerTsize').value; const tNum = document.getElementById('regPlayerTnum').value || "NA";
+            const pass = document.getElementById('regPlayerPass').value; const dob = getDOBString('regPlayer');
+            const photo = croppedImages.player || "https://via.placeholder.com/150";
+            
+            if(!name || !phone || !dob || !pass) return showAlert("Puri details bharein!", "error");
+            if(db.users.player[phone]) return showAlert("Is phone number se already Player profile bani hui hai!", "error");
+
+            db.users.player[phone] = { name, phone, batting, bowling, tSize, tNum, dob, pass, photo };
+            saveData(); 
+            clearFormInputs('player-reg'); croppedImages.player = ""; document.getElementById('playerPhotoStatus').innerText = "";
+            showAlert("Player Registration Successfully!", "success"); 
+            toggleSubView('player', 'login');
+        }
+
+        function loginUser(role) {
+            const phone = document.getElementById(`log${role.charAt(0).toUpperCase() + role.slice(1)}Phone`).value;
+            const pass = document.getElementById(`log${role.charAt(0).toUpperCase() + role.slice(1)}Pass`).value;
+            const user = db.users[role][phone];
+            if(user && user.pass === pass) {
+                activeSession = { role, phone, data: user };
+                document.getElementById('sessionIndicator').innerText = `Role: ${role.toUpperCase()} | ${user.name}`;
+                if(role === 'mgmt') buildMgmtDashboard(); else buildUserDashboard();
+            } else { showAlert("Galt Username ya Password!", "error"); }
+        }
+
+        let resetTempPhone = null;
+        function verifyDOB(role) {
+            const phone = document.getElementById(`res${role.charAt(0).toUpperCase() + role.slice(1)}Phone`).value;
+            const dob = getDOBString(`res${role.charAt(0).toUpperCase() + role.slice(1)}`);
+            if(!dob) return showAlert("Date of Birth select karein!", "error");
+            if(db.users[role][phone] && db.users[role][phone].dob === dob) {
+                resetTempPhone = phone; document.getElementById(`${role}-new-pass-box`).classList.remove('hidden');
+            } else showAlert("Invalid verification!", "error");
+        }
+        function updatePassword(role) {
+            const np = document.getElementById(`new${role.charAt(0).toUpperCase() + role.slice(1)}Pass`).value;
+            if(!np) return;
+            db.users[role][resetTempPhone].pass = np; saveData(); showAlert("Password updated successfully!", "success");
+            toggleSubView(role, 'login'); document.getElementById(`${role}-new-pass-box`).classList.add('hidden');
+        }
+
+        // ==========================================
+        //  MANAGEMENT DASHBOARD
+        // ==========================================
+        function createTournament() {
+            const details = {
+                name: document.getElementById('tName').value, teams: document.getElementById('tTeams').value,
+                type: document.getElementById('tType').value, overs: document.getElementById('tOvers').value,
+                powerplay: document.getElementById('tPowerplay').value, location: document.getElementById('tLocation').value,
+                winPrize: document.getElementById('tWinPrize').value, runnerPrize: document.getElementById('tRunnerPrize').value,
+                members: document.getElementById('tMembers').value
+            };
+            const regStart = document.getElementById('tRegStart').value; const regEnd = document.getElementById('tRegEnd').value;
+            if(!details.name || !regStart || !regEnd) return showAlert("Tournament Name aur Dates mandatory hain!", "error");
+            
+            const passcode = generatePasscode();
+            const initPaymentStatus = db.globalConfig.mgmtPaid ? 'Not Paid' : 'Verified';
+
+            db.tournaments[passcode] = {
+                details, mgmtPhone: activeSession.phone, paymentStatus: initPaymentStatus, mgmtUtr: '',
+                config: { 
+                    headline: details.name + " Live Action", auctionDate: "", regStart, regEnd,
+                    teamBudget: 5000000, bid1: 50000, bid2: 100000, bid3: 200000, timerSeconds: 30,
+                    dobStart: document.getElementById('tDobStart').value, dobEnd: document.getElementById('tDobEnd').value, 
+                    upiId: document.getElementById('tUpiId').value, 
+                    ownerFee: document.getElementById('tOwnerFee').value || 0, playerFee: document.getElementById('tPlayerFee').value || 0
+                }, joinedOwners: {}, joinedPlayers: {}
+            };
+            saveData(); clearFormInputs('workspace-mgmt');
+            showAlert(`Tournament Created Successfully!\nPasscode: ${passcode}`, "success"); buildMgmtDashboard();
+        }
+
+        function submitMgmtTournamentUtr(code) {
+            const utr = document.getElementById(`mgmtUtr_${code}`).value.trim();
+            if(!utr) return showAlert("UTR Number zaroori hai!", "error");
+            if(isUtrDuplicate(utr)) return showAlert("Yeh UTR already system mein submit ho chuka hai! Duplicate UTR allow nahi hai.", "error");
+
+            db.tournaments[code].mgmtUtr = utr;
+            db.tournaments[code].paymentStatus = 'Pending Verification';
+            saveData();
+            showAlert("UTR Submitted Successfully!\nPayment verify hone tak intezar karein.", "success");
+            buildMgmtDashboard();
+        }
+
+        function buildMgmtDashboard() {
+            renderWorkspace('workspace-mgmt');
+            const list = document.getElementById('mgmt-tournaments-list'); list.innerHTML = ""; let found = false;
+            Object.keys(db.tournaments).forEach(code => {
+                const t = db.tournaments[code];
+                if(t.mgmtPhone === activeSession.phone) {
+                    found = true;
+                    let actionsHtml = "";
+                    if (t.paymentStatus === 'Verified' || !db.globalConfig.mgmtPaid) {
+                        actionsHtml = `<button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="openTournamentAdmin('${code}')">Manage System</button>`;
+                    } else if (t.paymentStatus === 'Pending Verification') {
+                        actionsHtml = `<div style="margin-top:15px; color:orange; font-weight:bold; font-size:1.1rem;">⏳ UTR Submitted (${t.mgmtUtr}). Main Admin Verification pending.</div>`;
+                    } else {
+                        actionsHtml = `
+                            <div class="payment-box">
+                                <p style="color:red; font-weight:bold; margin-top:0;">⚠️ Pay Admin Fee to Make Tournament LIVE</p>
+                                <p><b>Admin UPI:</b> ${db.globalConfig.adminUpi} <br> <b>Fee:</b> ₹${db.globalConfig.mgmtFee}</p>
+                                <input type="text" id="mgmtUtr_${code}" placeholder="Enter Payment UTR / Ref No.">
+                                <button class="btn btn-success" style="width:100%;" onclick="submitMgmtTournamentUtr('${code}')">Submit UTR to Go Live</button>
+                            </div>
+                        `;
+                    }
+
+                    list.innerHTML += `
+                        <div class="tournament-card">
+                            <button class="delete-t-btn" onclick="deleteTournament('${code}')">✖</button>
+                            <h3 style="margin-top:0; padding-right:30px;">${t.details.name}</h3>
+                            <p><b>Passcode:</b> <span class="highlight-code" style="font-size:1rem; padding: 2px 8px;">${code}</span></p>
+                            <p><b>Joined:</b> ${Object.keys(t.joinedOwners).length} Owners | ${Object.keys(t.joinedPlayers).length} Players</p>
+                            ${actionsHtml}
+                        </div>`;
+                }
+            });
+            if(!found) list.innerHTML = "<p>No tournaments created yet.</p>";
+        }
+
+        function deleteTournament(code) {
+            showConfirm("Kya aap is tournament ko hamesha ke liye delete karna chahte hain?", () => {
+                delete db.tournaments[code]; saveData(); showAlert("Tournament Deleted Successfully!", "success"); buildMgmtDashboard();
+            });
+        }
+
+        let activeTournamentCode = null;
+        function openTournamentAdmin(code) {
+            activeTournamentCode = code; const t = db.tournaments[code];
+            document.getElementById('workspace-mgmt').classList.add('hidden'); document.getElementById('workspace-tournament-admin').classList.remove('hidden');
+            
+            document.getElementById('ta-name').innerText = t.details.name; document.getElementById('ta-code').innerText = code;
+            document.getElementById('taHead').value = t.config.headline || ""; document.getElementById('taAuctionDate').value = t.config.auctionDate || "";
+            document.getElementById('taTeamBudget').value = t.config.teamBudget || 5000000; document.getElementById('taBid1').value = t.config.bid1 || 50000;
+            document.getElementById('taBid2').value = t.config.bid2 || 100000; document.getElementById('taBid3').value = t.config.bid3 || 200000;
+            document.getElementById('taTimerSeconds').value = t.config.timerSeconds || 30;
+            document.getElementById('taDobStart').value = t.config.dobStart || ""; document.getElementById('taDobEnd').value = t.config.dobEnd || "";
+            document.getElementById('taUpiId').value = t.config.upiId || ""; document.getElementById('taOwnerFee').value = t.config.ownerFee || "";
+            document.getElementById('taPlayerFee').value = t.config.playerFee || ""; renderTADataLists();
+        }
+
+        function closeTournamentAdmin() { document.getElementById('workspace-tournament-admin').classList.add('hidden'); buildMgmtDashboard(); activeTournamentCode = null; }
+
+        function switchTAView(view) {
+            document.querySelectorAll('.ta-view').forEach(el => el.classList.add('hidden')); document.getElementById(`ta-${view}`).classList.remove('hidden');
+            document.querySelectorAll('#workspace-tournament-admin .portal-btn').forEach(el => el.classList.remove('active')); document.getElementById(`btn-ta-${view}`).classList.add('active');
+            if(view === 'squads') renderAllSquadsForAdmin();
+        }
+
+        function saveTAConfig() {
+            const t = db.tournaments[activeTournamentCode];
+            t.config.headline = document.getElementById('taHead').value; t.config.auctionDate = document.getElementById('taAuctionDate').value;
+            t.config.teamBudget = parseInt(document.getElementById('taTeamBudget').value) || 5000000;
+            t.config.bid1 = parseInt(document.getElementById('taBid1').value) || 50000; t.config.bid2 = parseInt(document.getElementById('taBid2').value) || 100000;
+            t.config.bid3 = parseInt(document.getElementById('taBid3').value) || 200000; t.config.timerSeconds = parseInt(document.getElementById('taTimerSeconds').value) || 30;
+            t.config.dobStart = document.getElementById('taDobStart').value; t.config.dobEnd = document.getElementById('taDobEnd').value;
+            t.config.upiId = document.getElementById('taUpiId').value; t.config.ownerFee = parseInt(document.getElementById('taOwnerFee').value) || 0;
+            t.config.playerFee = parseInt(document.getElementById('taPlayerFee').value) || 0;
+            saveData(); showAlert("Tournament Config Saved!", "success");
+        }
+
+        function approvePayment(role, phone) {
+            const t = db.tournaments[activeTournamentCode];
+            if(role === 'owner') {
+                t.joinedOwners[phone].paymentStatus = 'Verified'; t.joinedOwners[phone].approved = true;
+                if(t.joinedOwners[phone].purse === undefined) t.joinedOwners[phone].purse = t.config.teamBudget || 5000000;
+            } else {
+                const price = document.getElementById(`valPrice_${phone}`).value;
+                if(!price || parseInt(price) <= 0) return showAlert("Base Price set karein approve karne se pehle!", "error");
+                t.joinedPlayers[phone].basePrice = parseInt(price); t.joinedPlayers[phone].paymentStatus = 'Verified'; t.joinedPlayers[phone].approved = true;
+            }
+            saveData(); renderTADataLists(); showAlert("Payment Verified & Approved!", "success");
+        }
+
+        function removeTAUser(role, phone) {
+            showConfirm("Kya aap is user ko tournament se block/remove karna chahte hain?", () => {
+                const t = db.tournaments[activeTournamentCode];
+                if(role === 'owner') delete t.joinedOwners[phone]; else delete t.joinedPlayers[phone];
+                saveData(); renderTADataLists(); showAlert("User Removed!", "success");
+            });
+        }
+
+        function reAuctionPlayer(phone) {
+            const newPrice = document.getElementById(`reprice_${phone}`).value;
+            if(!newPrice || parseInt(newPrice) <= 0) return showAlert("Naya base price enter karein!", "error");
+            const t = db.tournaments[activeTournamentCode];
+            t.joinedPlayers[phone].basePrice = parseInt(newPrice); t.joinedPlayers[phone].soldStatus = "Available";
+            saveData(); renderTADataLists(); showAlert("Player wapas auction pool me aa gaya!", "success");
+        }
+
+        function renderTADataLists() {
+            const t = db.tournaments[activeTournamentCode];
+            const oBody = document.getElementById('ta-owners-body'); oBody.innerHTML = "";
+            Object.keys(t.joinedOwners).forEach(phone => {
+                const globalOwner = db.users.owner[phone]; const localData = t.joinedOwners[phone];
+                let payStr = localData.paymentStatus === 'Verified' ? `<span style="color:green;">Verified (UTR: ${localData.utr})</span>` :
+                             localData.paymentStatus === 'Pending Verification' ? `<span style="color:orange;font-weight:bold;">UTR: ${localData.utr}</span>` : `<span style="color:red;">Not Paid</span>`;
+                oBody.innerHTML += `<tr>
+                    <td><img src="${globalOwner.photo}" class="thumbnail"></td><td><b>${globalOwner.name}</b></td><td>${globalOwner.team}</td><td>${phone}</td><td>${payStr}</td>
+                    <td>${localData.paymentStatus === 'Pending Verification' ? `<button class="btn btn-success btn-sm" onclick="approvePayment('owner', '${phone}')">Approve</button>` : (localData.approved ? '✅' : '⏳')}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="removeTAUser('owner', '${phone}')">Block</button></td>
+                </tr>`;
+            });
+
+            const pBody = document.getElementById('ta-players-body'); pBody.innerHTML = ""; const uBody = document.getElementById('ta-unsold-body'); uBody.innerHTML = "";
+            Object.keys(t.joinedPlayers).forEach(phone => {
+                const globalPlayer = db.users.player[phone]; const localData = t.joinedPlayers[phone];
+                if (localData.soldStatus === 'Unsold') {
+                    uBody.innerHTML += `<tr>
+                        <td><img src="${globalPlayer.photo}" class="thumbnail"></td><td><b>${globalPlayer.name}</b></td><td>${globalPlayer.batting} / ${globalPlayer.bowling}</td>
+                        <td style="color:red; font-weight:bold;">UNSOLD</td><td><input type="number" id="reprice_${phone}" value="${localData.basePrice}" style="width:100px; padding:5px;"></td>
+                        <td><button class="btn btn-primary btn-sm" onclick="reAuctionPlayer('${phone}')">Make Available</button></td>
+                    </tr>`;
+                }
+                let payStr = localData.paymentStatus === 'Verified' ? `<span style="color:green;">Verified (UTR: ${localData.utr})</span>` :
+                             localData.paymentStatus === 'Pending Verification' ? `<span style="color:orange;font-weight:bold;">UTR: ${localData.utr}</span>` : `<span style="color:red;">Not Paid</span>`;
+                pBody.innerHTML += `<tr>
+                    <td><img src="${globalPlayer.photo}" class="thumbnail"></td><td><b>${globalPlayer.name}</b><br><small>Size: ${globalPlayer.tSize} | No: ${globalPlayer.tNum}</small></td><td>${globalPlayer.batting} / ${globalPlayer.bowling}</td>
+                    <td>${payStr}</td><td><input type="number" id="valPrice_${phone}" value="${localData.basePrice||''}" placeholder="Set Price" style="width:100px; padding:5px;" ${localData.approved ? 'disabled':''}></td>
+                    <td>${localData.paymentStatus === 'Pending Verification' ? `<button class="btn btn-success btn-sm" onclick="approvePayment('player', '${phone}')">Approve</button>` : (localData.approved ? '✅' : '⏳')}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="removeTAUser('player', '${phone}')">Block</button></td>
+                </tr>`;
+            });
+        }
+
+        function renderAllSquadsForAdmin() {
+            const t = db.tournaments[activeTournamentCode]; const sqContainer = document.getElementById('ta-squads-container'); sqContainer.innerHTML = "";
+            Object.keys(t.joinedOwners).forEach(phone => {
+                if(t.joinedOwners[phone].approved) {
+                    const ownerUser = db.users.owner[phone];
+                    let html = `<div class="card" style="padding:15px; border-top:3px solid var(--stadium-green);"><h4 style="margin:0;color:var(--night-sky)">🛡️ ${ownerUser.team}</h4><hr style="margin:10px 0;">`;
+                    let count = 0; let spent = 0;
+                    Object.keys(t.joinedPlayers).forEach(pPhone => {
+                        const lp = t.joinedPlayers[pPhone];
+                        if(lp.soldStatus === 'Sold' && lp.buyerTeam === ownerUser.team) {
+                            html += `<div style="font-size:0.85rem; padding:4px 0; border-bottom:1px dashed #ccc;">🏏 ${db.users.player[pPhone].name} (₹${lp.finalPrice})</div>`;
+                            count++; spent += lp.finalPrice;
+                        }
+                    });
+                    if(count === 0) html += `<div style="font-size:0.85rem; color:#888;">No players bought yet</div>`;
+                    html += `<div style="margin-top:10px; font-weight:bold; font-size:0.9rem; color:var(--leather-red);">Total: ${count} Players | Spent: ₹${spent}</div></div>`;
+                    sqContainer.innerHTML += html;
+                }
+            });
+            if(sqContainer.innerHTML === "") sqContainer.innerHTML = "<p>Koi team approved nahi hai.</p>";
+        }
+
+        // ==========================================
+        //  USER DASHBOARD (JOIN & PAY)
+        // ==========================================
+        function submitPayment(code) {
+            const utr = document.getElementById(`utr_${code}`).value.trim();
+            if(!utr) return showAlert("Kripya UTR Number darj karein!", "error");
+            if(isUtrDuplicate(utr)) return showAlert("Yeh UTR already system mein submit ho chuka hai! Duplicate UTR allow nahi hai.", "error");
+
+            const t = db.tournaments[code]; const dict = activeSession.role === 'owner' ? t.joinedOwners : t.joinedPlayers;
+            dict[activeSession.phone].utr = utr; dict[activeSession.phone].paymentStatus = 'Pending Verification';
+            saveData();
+            showAlert(`UTR Submitted Successfully!\nPayment verify hone tak kripya intezar karein.`, "success");
+            buildUserDashboard(); 
+        }
+
+        function buildUserDashboard() {
+            renderWorkspace('workspace-user');
+            document.getElementById('user-welcome-text').innerText = `👋 Welcome ${activeSession.data.name} (${activeSession.role.toUpperCase()})`;
+            const list = document.getElementById('user-tournaments-list'); list.innerHTML = ""; let found = false;
+            
+            Object.keys(db.tournaments).forEach(code => {
+                const t = db.tournaments[code];
+                const dictName = activeSession.role === 'owner' ? 'joinedOwners' : 'joinedPlayers';
+                if(t[dictName][activeSession.phone]) {
+                    found = true; const localData = t[dictName][activeSession.phone];
+                    let specificStatus = ""; let paymentBlock = "";
+
+                    if (localData.approved) {
+                        specificStatus = `<span style="color:green; font-weight:bold;">✔️ Approved - You are in the Tournament</span>`;
+                        if(activeSession.role === 'player' && localData.soldStatus === 'Sold') {
+                            specificStatus += `<br><span style="color:blue;"><b>SOLD</b> to ${localData.buyerTeam} for ₹${localData.finalPrice}</span>`;
+                        }
+                    } else {
+                        if (localData.paymentStatus === 'Pending Verification') {
+                            specificStatus = `<span style="color:orange; font-weight:bold; font-size:1.1rem;">⏳ Aapka UTR submit ho gaya hai. Payment verify hone tak intezar karein. (UTR: ${localData.utr})</span>`;
+                        } else {
+                            specificStatus = `<span style="color:red; font-weight:bold;">❌ Payment Required</span>`;
+                            const fee = activeSession.role === 'owner' ? t.config.ownerFee : t.config.playerFee;
+                            const upi = t.config.upiId || "Not Provided";
+                            paymentBlock = `
+                                <div class="payment-box">
+                                    <p style="margin-top:0; font-weight:bold;">Scan & Pay Entry Fee</p>
+                                    <p><b>UPI ID:</b> ${upi} <br> <b>Amount to Pay:</b> ₹${fee}</p>
+                                    <input type="text" id="utr_${code}" placeholder="Enter Payment UTR / Reference No.">
+                                    <button class="btn btn-success" style="width:100%;" onclick="submitPayment('${code}')">Submit UTR</button>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    list.innerHTML += `
+                        <div class="tournament-card">
+                            <h3 style="margin-top:0;">${t.details.name}</h3>
+                            <p><b>Status:</b> ${specificStatus}</p>
+                            ${paymentBlock}
+                            ${localData.approved ? `<button class="btn btn-primary" style="width:100%; margin-top:10px; background:var(--stadium-green);" onclick="enterLiveArenaUser('${code}')">${activeSession.role === 'player' ? 'Watch Live Auction' : 'Enter Live Arena'}</button>` : ''}
+                            ${localData.approved && activeSession.role === 'owner' ? `<button class="btn btn-gold" style="width:100%; margin-top:10px;" onclick="openOwnerSquadModal('${code}')">View Full Squad</button>` : ''}
+                        </div>
+                    `;
+                }
+            });
+            if(!found) list.innerHTML = "<p>No joined tournaments yet. Enter a passcode above to link your profile.</p>";
+        }
+
+        function joinTournamentViaCode() {
+            const code = document.getElementById('joinPasscode').value.trim().toUpperCase();
+            if(!code) return;
+            if(!db.tournaments[code]) return showAlert("Invalid Passcode! Aisa koi tournament nahi mila.", "error");
+
+            const t = db.tournaments[code]; const today = new Date().toISOString().split('T')[0];
+
+            if(t.config.regStart && today < t.config.regStart) return showAlert(`Is tournament ka registration ${t.config.regStart} se shuru hoga.`, "error");
+            if(t.config.regEnd && today > t.config.regEnd) return showAlert(`Is tournament ki aakhri date nikal chuki hai. Registration band hai.`, "error");
+
+            if(activeSession.role === 'player') {
+                const pDob = activeSession.data.dob; 
+                if(t.config.dobStart && pDob < t.config.dobStart) return showAlert("Aapki umar (age) is tournament ki limit se zyada hai!", "error");
+                if(t.config.dobEnd && pDob > t.config.dobEnd) return showAlert("Aapki umar (age) is tournament ki limit se kam hai!", "error");
+            }
+
+            const dictName = activeSession.role === 'owner' ? 'joinedOwners' : 'joinedPlayers';
+            if(t[dictName][activeSession.phone]) return showAlert("Aap is tournament ke liye pehle hi request bhej chuke hain!", "info");
+
+            if(activeSession.role === 'owner') t.joinedOwners[activeSession.phone] = { approved: false, paymentStatus: 'Not Paid', utr: '' };
+            else t.joinedPlayers[activeSession.phone] = { approved: false, paymentStatus: 'Not Paid', utr: '', basePrice: 0, soldStatus: "Available", buyerTeam: "None", finalPrice: 0 };
+            
+            saveData(); document.getElementById('joinPasscode').value = "";
+            showAlert("Tournament Joined Successfully!\nNiche payment form update ho gaya hai.", "success");
+            buildUserDashboard(); 
+        }
+
+        function openOwnerSquadModal(code) {
+            const t = db.tournaments[code]; const sqList = document.getElementById('sqModalList'); sqList.innerHTML = "";
+            let count = 0; let spent = 0;
+            Object.keys(t.joinedPlayers).forEach(pPhone => {
+                const lp = t.joinedPlayers[pPhone];
+                if(lp.soldStatus === 'Sold' && lp.buyerTeam === activeSession.data.team) {
+                    const gp = db.users.player[pPhone]; count++; spent += lp.finalPrice;
+                    sqList.innerHTML += `<div class="squad-item"><img src="${gp.photo}"><div><b>${gp.name}</b><br><span style="font-size:0.8rem; color:#666;">${gp.batting}/${gp.bowling} | ₹${lp.finalPrice}</span></div></div>`;
+                }
+            });
+            if(count === 0) sqList.innerHTML = "<p style='text-align:center;'>Aapne abhi koi player nahi kharida hai.</p>";
+            document.getElementById('sqModalCount').innerText = count; document.getElementById('sqModalSpent').innerText = "₹" + spent;
+            document.getElementById('squadModal').classList.remove('hidden');
+        }
+        function closeSquadModal() { document.getElementById('squadModal').classList.add('hidden'); }
+
+        // ==========================================
+        //  LIVE ARENA LOGIC
+        // ==========================================
+        let arenaContextCode = null; let arenaPlayerPhoneActive = null;
+        let currentHighestBid = 0; let highestBidderTeam = "None";
+        let timerEngine = null; let timeLeft = 30; 
+
+        function launchLiveArenaAsAdmin() {
+            arenaContextCode = activeTournamentCode; document.getElementById('workspace-tournament-admin').classList.add('hidden'); setupArenaUI('mgmt');
+        }
+        function enterLiveArenaUser(code) {
+            arenaContextCode = code; document.getElementById('workspace-user').classList.add('hidden'); setupArenaUI(activeSession.role);
+        }
+        function exitLiveArena() {
+            document.getElementById('workspace-arena').classList.add('hidden');
+            if(activeSession.role === 'mgmt') { activeTournamentCode = arenaContextCode; document.getElementById('workspace-tournament-admin').classList.remove('hidden'); }
+            else { buildUserDashboard(); }
+        }
+
+        function updateMgmtSummary() {
+            if(activeSession.role !== 'mgmt') return;
+            const t = db.tournaments[arenaContextCode]; const tbody = document.getElementById('arMgmtSummaryBody'); tbody.innerHTML = "";
+            const totalBudget = t.config.teamBudget || 5000000;
+            Object.keys(t.joinedOwners).forEach(phone => {
+                if(t.joinedOwners[phone].approved) {
+                    const ownerUser = db.users.owner[phone]; const purse = t.joinedOwners[phone].purse !== undefined ? t.joinedOwners[phone].purse : totalBudget;
+                    const spent = totalBudget - purse; let playerCount = 0;
+                    Object.values(t.joinedPlayers).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === ownerUser.team) playerCount++; });
+                    tbody.innerHTML += `<tr><td><b>${ownerUser.team}</b></td><td style="color:${playerCount>=15?'red':'black'}">${playerCount}/15</td>
+                        <td style="color:red;">₹${spent.toLocaleString('en-IN')}</td><td style="color:green; font-weight:bold;">₹${purse.toLocaleString('en-IN')}</td></tr>`;
+                }
+            });
+        }
+
+        function updateOwnerSquadView() {
+            if(activeSession.role !== 'owner') return;
+            const t = db.tournaments[arenaContextCode]; const squadList = document.getElementById('arOwnerSquadList');
+            squadList.innerHTML = ""; let count = 0;
+            Object.keys(t.joinedPlayers).forEach(phone => {
+                const lp = t.joinedPlayers[phone];
+                if(lp.soldStatus === 'Sold' && lp.buyerTeam === activeSession.data.team) {
+                    count++; const globP = db.users.player[phone];
+                    squadList.innerHTML += `<div style="padding: 5px 0; border-bottom: 1px solid #eee;">🏏 <b>${globP.name}</b> - ₹${lp.finalPrice.toLocaleString('en-IN')}</div>`;
+                }
+            });
+            document.getElementById('ownerSquadCount').innerText = count;
+            if(count === 0) squadList.innerHTML = "No players bought yet.";
+        }
+
+        function setupArenaUI(roleContext) {
+            document.getElementById('workspace-arena').classList.remove('hidden');
+            const t = db.tournaments[arenaContextCode];
+            document.getElementById('arenaTName').innerText = t.details.name;
+            document.getElementById('globalBanner').innerText = (t.config.headline || t.details.name) + " - LIVE BROADCAST";
+            document.getElementById('arTimer').innerText = t.config.timerSeconds || 30;
+
+            if(roleContext === 'mgmt') {
+                document.getElementById('arAdminControls').classList.remove('hidden'); document.getElementById('arOwnerControls').classList.add('hidden');
+                document.getElementById('arOwnerWallet').classList.add('hidden'); document.getElementById('arMgmtSummary').classList.remove('hidden');
+                document.getElementById('arOwnerSquadView').classList.add('hidden'); updateMgmtSummary(); 
+            } else if(roleContext === 'owner') {
+                document.getElementById('arOwnerControls').classList.remove('hidden'); document.getElementById('arAdminControls').classList.add('hidden');
+                document.getElementById('arOwnerWallet').classList.remove('hidden'); document.getElementById('arMgmtSummary').classList.add('hidden');
+                document.getElementById('arOwnerSquadView').classList.remove('hidden');
+
+                const ownerData = t.joinedOwners[activeSession.phone]; const total = t.config.teamBudget || 5000000;
+                const left = ownerData.purse !== undefined ? ownerData.purse : total;
+                document.getElementById('walletTotal').innerText = total.toLocaleString('en-IN'); document.getElementById('walletLeft').innerText = left.toLocaleString('en-IN');
+                updateOwnerSquadView();
+
+                const b1 = t.config.bid1 || 50000; const b2 = t.config.bid2 || 100000; const b3 = t.config.bid3 || 200000;
+                document.getElementById('arOwnerControls').innerHTML = `
+                    <button class="btn" style="background:#059669; color:white;" onclick="placeBid(${b1})">+ ₹${b1.toLocaleString('en-IN')}</button>
+                    <button class="btn" style="background:#0d9488; color:white;" onclick="placeBid(${b2})">+ ₹${b2.toLocaleString('en-IN')}</button>
+                    <button class="btn" style="background:#1d4ed8; color:white;" onclick="placeBid(${b3})">+ ₹${b3.toLocaleString('en-IN')}</button>
+                `;
+            } else if(roleContext === 'player') {
+                document.getElementById('arOwnerControls').classList.add('hidden'); document.getElementById('arAdminControls').classList.add('hidden');
+                document.getElementById('arOwnerWallet').classList.add('hidden'); document.getElementById('arMgmtSummary').classList.add('hidden');
+                document.getElementById('arOwnerSquadView').classList.add('hidden');
+            }
+        }
+
+        function adminRollNextPlayer() {
+            clearInterval(timerEngine); const t = db.tournaments[arenaContextCode];
+            const availablePhones = Object.keys(t.joinedPlayers).filter(ph => t.joinedPlayers[ph].approved && t.joinedPlayers[ph].soldStatus === "Available");
+            if(availablePhones.length === 0) return showAlert("Pool me koi Available player bacha nahi h! Unsold players ko wapas Re-Auction list me daalein.", "info");
+
+            arenaPlayerPhoneActive = availablePhones[Math.floor(Math.random() * availablePhones.length)];
+            const gPlayer = db.users.player[arenaPlayerPhoneActive]; const lPlayer = t.joinedPlayers[arenaPlayerPhoneActive];
+
+            currentHighestBid = lPlayer.basePrice; highestBidderTeam = "No Bids Yet";
+
+            document.getElementById('arName').innerText = gPlayer.name; document.getElementById('arPhoto').src = gPlayer.photo;
+            document.getElementById('arBat').innerText = gPlayer.batting; document.getElementById('arBowl').innerText = gPlayer.bowling;
+            document.getElementById('arBaseVal').innerText = `₹${lPlayer.basePrice.toLocaleString('en-IN')}`;
+            document.getElementById('arCurrentBid').innerText = currentHighestBid.toLocaleString('en-IN');
+            document.getElementById('arLastBidder').innerText = highestBidderTeam; document.getElementById('arTimerDisplay').classList.remove('danger-time');
+
+            startArenaCountdown();
+        }
+
+        function startArenaCountdown() {
+            const t = db.tournaments[arenaContextCode]; timeLeft = t.config.timerSeconds || 30; 
+            document.getElementById('arTimer').innerText = timeLeft; document.getElementById('arTimerDisplay').classList.remove('danger-time');
+
+            clearInterval(timerEngine);
+            timerEngine = setInterval(() => {
+                timeLeft--; document.getElementById('arTimer').innerText = timeLeft;
+                if(timeLeft <= 5 && timeLeft > 0) { document.getElementById('arTimerDisplay').classList.add('danger-time'); playBeep(); }
+                if(timeLeft <= 0) { clearInterval(timerEngine); document.getElementById('arTimerDisplay').classList.remove('danger-time'); finishPlayerRoll(); }
+            }, 1000);
+        }
+
+        function placeBid(amt) {
+            if(!arenaPlayerPhoneActive) return showAlert("Floor par koi active player nahi h.", "error");
+            if(activeSession.role === 'owner') {
+                const t = db.tournaments[arenaContextCode]; let boughtCount = 0;
+                Object.values(t.joinedPlayers).forEach(p => { if(p.soldStatus === 'Sold' && p.buyerTeam === activeSession.data.team) boughtCount++; });
+                if(boughtCount >= 15) return showAlert("Aapki team mein 15 players poore ho chuke hain! Boli nahi laga sakte.", "error");
+                const purseLeft = t.joinedOwners[activeSession.phone].purse;
+                if((currentHighestBid + amt) > purseLeft) return showAlert(`Aapki remaining limit (₹${purseLeft.toLocaleString('en-IN')}) is bid ke liye kafi nahi hai!`, "error");
+            }
+            currentHighestBid += amt;
+            if(activeSession.role === 'owner') highestBidderTeam = activeSession.data.team; else highestBidderTeam = "Admin Simulator";
+
+            document.getElementById('arCurrentBid').innerText = currentHighestBid.toLocaleString('en-IN');
+            document.getElementById('arLastBidder').innerText = highestBidderTeam; startArenaCountdown(); 
+        }
+
+        function finishPlayerRoll() {
+            if(!arenaPlayerPhoneActive) return;
+            const t = db.tournaments[arenaContextCode]; const lPlayer = t.joinedPlayers[arenaPlayerPhoneActive];
+            const gPlayer = db.users.player[arenaPlayerPhoneActive]; const logs = document.getElementById('arLogs');
+
+            if(highestBidderTeam === "No Bids Yet") {
+                lPlayer.soldStatus = "Unsold"; showAlert(`${gPlayer.name} has gone UNSOLD!`, "error");
+                logs.innerHTML += `<div style="padding:5px; border-left:3px solid red;">❌ ${gPlayer.name} - UNSOLD</div>`;
+            } else {
+                lPlayer.soldStatus = "Sold"; lPlayer.buyerTeam = highestBidderTeam; lPlayer.finalPrice = currentHighestBid;
+                let buyerPhone = null; Object.keys(t.joinedOwners).forEach(p => { if(db.users.owner[p].team === highestBidderTeam) buyerPhone = p; });
+                
+                if(buyerPhone) {
+                    t.joinedOwners[buyerPhone].purse -= currentHighestBid;
+                    if(activeSession.role === 'owner' && activeSession.phone === buyerPhone) {
+                        document.getElementById('walletLeft').innerText = t.joinedOwners[buyerPhone].purse.toLocaleString('en-IN');
+                        updateOwnerSquadView(); 
+                    }
+                }
+                showAlert(`SOLD! ${gPlayer.name} goes to ${highestBidderTeam} for ₹${currentHighestBid}`, "success");
+                logs.innerHTML += `<div style="padding:5px; border-left:3px solid green; background:#ecfdf5;">🏏 ${gPlayer.name} ➡️ ${highestBidderTeam} (₹${currentHighestBid.toLocaleString('en-IN')})</div>`;
+                if(activeSession.role === 'mgmt') updateMgmtSummary();
+            }
+            saveData(); arenaPlayerPhoneActive = null;
+        }
+    </script>
+</body>
+</html>
